@@ -1,0 +1,1 @@
+cargo watch -x "build --release" -s "run-fap .\target\thumbv7em-none-eabihf\release\sliding-tower.fap"
