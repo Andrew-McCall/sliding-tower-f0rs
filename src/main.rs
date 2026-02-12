@@ -44,6 +44,7 @@ pub fn get_game_state() -> Option<MutexGuard<'static, GameState>> {
         let res = GAME_STATE.try_lock();
         if res.is_none() {
             ERROR_CODE = 2;
+            update_app_state(AppState::Err);
         }
         res
     }
@@ -144,94 +145,114 @@ unsafe extern "C" fn draw_cb(canvas: *mut Canvas, _: *mut c_void) {
         }
     }
     let mut s = game_state.unwrap();
+    match app_state {
+        AppState::Playing => {
+            if s.drop_btn {
+                // All full
+                let replace_index = if !matches!(s.tower[0], PlacedBoxSlot::Empty) {
+                    let tower_height = s.tower.len();
+                    s.tower.copy_within(..tower_height - 1, 1);
+                    0
+                } else {
+                    s.tower
+                        .iter()
+                        .enumerate()
+                        .rev()
+                        .find(|(_, d)| matches!(d, PlacedBoxSlot::Empty))
+                        .unwrap()
+                        .0
+                };
+                let last_box = match s.tower[replace_index + 1] {
+                    PlacedBoxSlot::Used(placed_box_data) => placed_box_data,
+                    PlacedBoxSlot::Empty => PlacedBoxData { w: 64, x: 32 },
+                };
 
-    if s.drop_btn {
-        // All full
-        let replace_index = if !matches!(s.tower[0], PlacedBoxSlot::Empty) {
-            let tower_height = s.tower.len();
-            s.tower.copy_within(..tower_height - 1, 1);
-            0
-        } else {
-            s.tower
-                .iter()
-                .enumerate()
-                .rev()
-                .find(|(_, d)| matches!(d, PlacedBoxSlot::Empty))
-                .unwrap()
-                .0
-        };
-        let last_box = match s.tower[replace_index + 1] {
-            PlacedBoxSlot::Used(placed_box_data) => placed_box_data,
-            PlacedBoxSlot::Empty => PlacedBoxData { w: 64, x: 32 },
-        };
+                if last_box.x > s.x + s.w || s.x > last_box.x + last_box.w as i32 {
+                    update_app_state(AppState::GameOver);
+                    unsafe { canvas_draw_box(canvas, 10, 10, 10, 10) };
+                    return;
+                }
 
-        if last_box.x > s.x + s.w || s.x > last_box.x + last_box.w as i32 {
-            update_app_state(AppState::GameOver);
-            unsafe { canvas_draw_box(canvas, 10, 10, 10, 10) };
-            return;
-        }
-
-        let new_box = if s.x == last_box.x {
-            PlacedBoxData {
-                w: s.w.try_into().unwrap(),
-                x: s.x,
+                let new_box = if s.x == last_box.x {
+                    PlacedBoxData {
+                        w: s.w.try_into().unwrap(),
+                        x: s.x,
+                    }
+                } else if s.x < last_box.x {
+                    // left overhang
+                    let new_w = s.w.abs_diff(last_box.x.abs_diff(s.x) as i32) as i32;
+                    s.x += (s.w + new_w) / 2;
+                    s.w = new_w;
+                    PlacedBoxData {
+                        w: new_w.try_into().unwrap(),
+                        x: last_box.x,
+                    }
+                } else {
+                    // right overhang
+                    let new_w = (s.x + s.w) - (last_box.x + last_box.w as i32);
+                    s.x += (s.w + new_w) / 2;
+                    s.w = new_w;
+                    PlacedBoxData {
+                        w: new_w.try_into().unwrap(),
+                        x: s.x,
+                    }
+                };
+                s.tower[replace_index] = PlacedBoxSlot::Used(new_box);
+                s.score += 1;
             }
-        } else if s.x < last_box.x {
-            // left overhang
-            let new_w = s.w.abs_diff(last_box.x.abs_diff(s.x) as i32) as i32;
-            s.x += (s.w + new_w) / 2;
-            s.w = new_w;
-            PlacedBoxData {
-                w: new_w.try_into().unwrap(),
-                x: last_box.x,
+
+            s.x += s.speed;
+
+            // Bounce off screen edges (screen: 128x64)
+            if s.x <= 0 || s.x + s.w >= 128 {
+                s.speed = -s.speed;
             }
-        } else {
-            // right overhang
-            let new_w = (s.x + s.w) - (last_box.x + last_box.w as i32);
-            s.x += (s.w + new_w) / 2;
-            s.w = new_w;
-            PlacedBoxData {
-                w: new_w.try_into().unwrap(),
-                x: s.x,
-            }
-        };
-        s.tower[replace_index] = PlacedBoxSlot::Used(new_box);
-        s.score += 1;
-    }
 
-    s.x += s.speed;
+            // Draw box
+            unsafe {
+                canvas_clear(canvas);
+                canvas_draw_box(canvas, s.x, s.y, s.w.try_into().unwrap(), BOX_HEIGHT);
 
-    // Bounce off screen edges (screen: 128x64)
-    if s.x <= 0 || s.x + s.w >= 128 {
-        s.speed = -s.speed;
-    }
+                // let mut buf = [0u8; 7];
+                // buf[..5].copy_from_slice(b"SCORE: ");
+                // buf[5] = b'0' + s.score.max(9) as u8;
+                // buf[6] = 0;
+                // canvas_draw_str(canvas, 120, 10, buf.as_ptr());
 
-    // Draw box
-    unsafe {
-        canvas_clear(canvas);
-        canvas_draw_box(canvas, s.x, s.y, s.w.try_into().unwrap(), BOX_HEIGHT);
-
-        // let mut buf = [0u8; 7];
-        // buf[..5].copy_from_slice(b"SCORE: ");
-        // buf[5] = b'0' + s.score.max(9) as u8;
-        // buf[6] = 0;
-        // canvas_draw_str(canvas, 120, 10, buf.as_ptr());
-
-        // Draw Previous
-        for (index, slot) in s.tower.iter().enumerate() {
-            let slot = match slot {
-                PlacedBoxSlot::Used(data) => data,
-                PlacedBoxSlot::Empty => continue,
+                // Draw Previous
+                for (index, slot) in s.tower.iter().enumerate() {
+                    let slot = match slot {
+                        PlacedBoxSlot::Used(data) => data,
+                        PlacedBoxSlot::Empty => continue,
+                    };
+                    canvas_draw_box(
+                        canvas,
+                        slot.x,
+                        (18 + (index * (PLACED_HEIGHT + 1))).try_into().unwrap(),
+                        slot.w,
+                        PLACED_HEIGHT,
+                    );
+                }
             };
-            canvas_draw_box(
-                canvas,
-                slot.x,
-                (18 + (index * (PLACED_HEIGHT + 1))).try_into().unwrap(),
-                slot.w,
-                PLACED_HEIGHT,
-            );
         }
-    };
+        AppState::Menu => unsafe {
+            canvas_clear(canvas);
+            canvas_draw_str(canvas, 32, 32, b"MENU".as_ptr());
+        },
+        AppState::GameOver => unsafe {
+            canvas_clear(canvas);
+            canvas_draw_str(canvas, 32, 32, b"GAMEOVER".as_ptr());
+        },
+        AppState::Pause => unsafe {
+            canvas_clear(canvas);
+            canvas_draw_str(canvas, 32, 32, b"PAUSE".as_ptr());
+        },
+        AppState::Quit => unsafe {
+            canvas_clear(canvas);
+            canvas_draw_str(canvas, 32, 32, b"QUIT".as_ptr());
+        },
+        AppState::Err => panic!(),
+    }
 }
 
 unsafe extern "C" fn input_cb(event: *mut InputEvent, _: *mut c_void) {
@@ -246,7 +267,6 @@ unsafe extern "C" fn input_cb(event: *mut InputEvent, _: *mut c_void) {
     let mut game_state = match get_game_state() {
         Some(s) => s,
         None => {
-            update_app_state(AppState::Err);
             return;
         }
     };
@@ -265,12 +285,16 @@ unsafe extern "C" fn input_cb(event: *mut InputEvent, _: *mut c_void) {
     } else {
         game_state.drop_btn_release = true;
     }
+
+    if app_state == AppState::Menu && ev.type_ == InputTypePress {
+        update_app_state(AppState::Playing);
+        return;
+    }
 }
 
 entry!(main);
 
 fn main(_args: Option<&core::ffi::CStr>) -> i32 {
-    let app_state = get_app_state();
     unsafe {
         // Allocate viewport
         let viewport = view_port_alloc();
@@ -283,7 +307,7 @@ fn main(_args: Option<&core::ffi::CStr>) -> i32 {
         view_port_enabled_set(viewport, true);
 
         // Main loop
-        while app_state != AppState::Quit {
+        while get_app_state() != AppState::Quit {
             view_port_update(viewport);
             furi_delay_ms(12); // ~80 FPS
         }
