@@ -165,11 +165,11 @@ unsafe extern "C" fn draw_cb(canvas: *mut Canvas, _: *mut c_void) {
             PlacedBoxSlot::Empty => PlacedBoxData { w: 64, x: 32 },
         };
 
-        // if last_box.x > s.x + s.w || s.x > last_box.x + last_box.w as i32 {
-        //     update_app_state(AppState::GameOver);
-        //     unsafe { canvas_draw_box(canvas, 10, 10, 10, 10) };
-        //     return;
-        // }
+        if last_box.x > s.x + s.w || s.x > last_box.x + last_box.w as i32 {
+            update_app_state(AppState::GameOver);
+            unsafe { canvas_draw_box(canvas, 10, 10, 10, 10) };
+            return;
+        }
 
         let new_box = if s.x == last_box.x {
             PlacedBoxData {
