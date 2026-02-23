@@ -1,63 +1,50 @@
-# `flipperzero-template`🚀
+# Sliding Tower
 
-A template for kick-starting a Rust + FlipperZero project using [`flipperzero-rs`](https://github.com/flipperzero-rs/flipperzero) 🐬❤️🦀.
+## Description
+### Introduction
+Sliding Tower is a small stacking game written in Rust for the Flipper Zero device platform. The goal is to drop moving blocks onto a tower and stack them as accurately as possible. Each successful placement increases your score. If blocks are misaligned, the game ends.
 
-# Usage
+The project is designed to run in a minimal embedded Rust environment.
 
-## Initial setup
+### My Implementation
+The game uses a simple state machine to manage menu navigation, gameplay, pause, and exit states. The screen is rendered on a small 128×64 canvas, and input is handled through device buttons.
 
-1. Install [`rustup`](https://rust-lang.github.io/rustup/) by following the instructions on [`rustup.rs`](https://rustup.rs/).
-1. Install the nightly build tool-chain to support the[`different-binary-name`](https://doc.rust-lang.org/cargo/reference/unstable.html#different-binary-name) feature:
-    ```
-    rustup toolchain install nightly
-    ```
-1. Install [`cargo-generate`](https://github.com/cargo-generate/cargo-generate):
-    ```
-    cargo install cargo-generate
-    ```
-1. Use `rustup` to install the `thumbv7em-none-eabihf` target to the nightly build:
-    ```
-    rustup target add --toolchain nightly thumbv7em-none-eabihf
-    ```
+Core gameplay features:
+- Moving block that slides horizontally
+- Block drop timing challenge
+- Tower stacking progression
+- Basic scoring system
 
-## Generate the project
-1. Use `cargo generate` to clone this template:
-    ```
-    cargo generate --git https://github.com/flipperzero-rs/flipperzero-template.git --name my-project
-    ```
-1. Switch into the local directory:
-    ```
-    cd my-project
-    ```
+## Controls
+### Navigation
+- **OK Button (Press)** – Drop block while playing.
+- **Back Button (Long Press)** – Quit the game.
 
-## Build with `cargo build`
+### Game Flow
+- Start from menu screen.
+- Press OK to begin.
+- Try to align the moving block with the tower.
+- Game ends if placement fails.
 
-```
-cargo build
-```
+## Building
 
-## Copy the binary to your Flipper Zero
+### Requirements
+- Rust toolchain supporting embedded targets.
+- Flipper Zero firmware development environment.
 
-> [!IMPORTANT]
-> This requires the `storage` command from [`flipperzero-tools`](https://crates.io/crates/flipperzero-tools) (`cargo install --locked flipperzero-tools`) or [`storage.py`](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/scripts/storage.py) from the official SDK.
-
-The resulting `.fap` binary can be found in [`target/thumbv7em-none-eabihf/debug`](target/thumbv7em-none-eabihf/debug).
-
-```sh
-storage send target/thumbv7em-none-eabihf/release/my-project.fap /ext/apps/Examples/my-project.fap
+### Cargo Build
+```bash
+cargo build --release
 ```
 
-## Build and run on change
-
-> [!IMPORTANT]
-> This requires the `run-fap` command from [`flipperzero-tools`](https://crates.io/crates/flipperzero-tools) (`cargo install --locked flipperzero-tools`) or [`runfap.py`](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/scripts/runfap.py) from the official SDK.
-
-You can automatically build and run your binary using [`cargo-watch`](https://crates.io/crates/cargo-watch) and the `run-fap` tool.
-
-```sh
-cargo watch -s 'cargo build --release && run-fap target/thumbv7em-none-eabihf/release/my-project.fap'
+Compiled output:
+```
+target/thumbv7em-none-eabihf/release/
 ```
 
-# License
+### Running
+Install the compiled application onto the Flipper Zero device and launch it from the application menu.
 
-This template is licensed under the [MIT License](https://github.com/flipperzero-rs/flipperzero/blob/v0.7.2/LICENSE).
+## License
+MIT License
+Copyright (c) 2025
