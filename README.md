@@ -47,4 +47,4 @@ Install the compiled application onto the Flipper Zero device and launch it from
 
 ## License
 MIT License
-Copyright (c) 2025
+Copyright © 2026
